@@ -1,0 +1,8 @@
+*.log
+*.csv
+subprocesses/Profwiz.exe
+subprocesses/*.config
+subprocesses/*.xml
+subprocesses/*.ppkg
+.claude/
+CLAUDE.md
