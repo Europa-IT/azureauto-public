@@ -1,39 +1,23 @@
-# Standalone script for checking user folder locations
+# Standalone script for checking user folder locations across every user profile on the device.
 
-$HKCUPath = "Registry::HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\"
-$UsrShellFld = "User Shell Folders"
-$ShellFld = "Shell Folders"
-
-try {
-    $DesktopKey = Get-ItemPropertyValue -Path ($HKCUPath + $UsrShellFld) -Name "Desktop" -ErrorAction Stop
-    $DocumentsKey = Get-ItemPropertyValue -Path ($HKCUPath + $UsrShellFld) -Name "Personal" -ErrorAction Stop
-    $PicturesKey = Get-ItemPropertyValue -Path ($HKCUPath + $UsrShellFld) -Name "My Pictures" -ErrorAction Stop
-}
-catch {
-    try {
-        $DesktopKey = Get-ItemPropertyValue -Path ($HKCUPath + $ShellFld) -Name "Desktop" -ErrorAction Stop
-        $DocumentsKey = Get-ItemPropertyValue -Path ($HKCUPath + $ShellFld) -Name "Personal" -ErrorAction Stop
-        $PicturesKey = Get-ItemPropertyValue -Path ($HKCUPath + $ShellFld) -Name "My Pictures" -ErrorAction Stop
+$Problems = @()
+foreach ($State in & "$PSScriptRoot\Get-UserProfileState.ps1") {
+    if ($State.HiveStatus -eq "Unavailable") {
+        Write-Host ("Could not read registry for {0}, folder locations not checked." -f $State.UserName)
+        continue
     }
-    catch {
-        $DesktopKey, $DocumentsKey, $PicturesKey = & "$PSScriptRoot\Test-UserFoldersElevated.ps1" -ErrorAction Stop
+    foreach ($Folder in $State.Folders | Where-Object { $_.Redirected }) {
+        $Problem = "{0}: {1} folder is redirected to {2}." -f $State.UserName, $Folder.Name, $Folder.Path
+        if ($Folder.LocalConflict) {
+            $Problem += " {0} already exists and will block the GPO from moving it back; rename or remove it." -f $Folder.LocalPath
+        }
+        $Problems += $Problem
     }
 }
 
-$UsrFolder = $env:USERPROFILE
-$DesktopParent = Split-Path -Parent $DesktopKey
-$DocumentsParent = Split-Path -Parent $DocumentsKey
-$PicturesParent = Split-Path -Parent $PicturesKey
-
-if ($DesktopParent -ne $UsrFolder) {
-    Throw ("Desktop folder is redirected to {0}." -f $DesktopKey)
-
-}
-elseif ($DocumentsParent -ne $UsrFolder) {
-    Throw ("Documents folder is redirected to {0}." -f $DocumentsKey)
-}
-elseif ($PicturesParent -ne $UsrFolder) {
-    Throw ("Pictures folder is redirected to {0}." -f $PicturesKey)
+if ($Problems.Count -gt 0) {
+    $Problems | ForEach-Object { Write-Host $_ }
+    Throw ("{0} redirected folder(s) found." -f $Problems.Count)
 }
 
-Write-Host "Desktop, Documents, and Pictures are all located in the local user folder."
+Write-Host "Desktop, Documents, and Pictures are located in the local user folder for all profiles."

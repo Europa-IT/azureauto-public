@@ -4,5 +4,6 @@ subprocesses/Profwiz.exe
 subprocesses/*.config
 subprocesses/*.xml
 subprocesses/*.ppkg
+config/license.ps1
 .claude/
 CLAUDE.md
